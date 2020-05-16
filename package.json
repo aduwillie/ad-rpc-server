@@ -1,0 +1,26 @@
+{
+  "name": "ad-rpc-server",
+  "version": "1.0.0",
+  "description": "An RPC server implementation",
+  "main": "lib/index.js",
+  "scripts": {
+    "lint": "eslint . --ext .ts",
+    "lint:fix": "eslint . --ext .ts --fix",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Adu Williams <aduwillie@gmail.com>",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/hapi__joi": "^17.1.0",
+    "@types/node": "^14.0.1",
+    "@types/winston": "^2.4.4",
+    "@typescript-eslint/eslint-plugin": "^2.33.0",
+    "@typescript-eslint/parser": "^2.33.0",
+    "eslint": "^7.0.0",
+    "typescript": "^3.9.2"
+  },
+  "dependencies": {
+    "@hapi/joi": "^17.1.1",
+    "winston": "^3.2.1"
+  }
+}
