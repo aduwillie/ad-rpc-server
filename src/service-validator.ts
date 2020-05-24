@@ -9,7 +9,7 @@ export interface ClassMethodType {
     (...args: ValueType[]): ValueType;
 }
 
-export type ServiceClass =  {
+export type ServiceClass = {
     [methodName: string]: ClassMethodType;
 }
 
@@ -24,8 +24,8 @@ export interface ServiceMethod {
             order: number;
             description?: string;
             type: ParamType;
-            optional: boolean;
-            defaultValue: ValueType;
+            optional?: boolean;
+            defaultValue?: ValueType;
         };
     };
     returnInfo: {
@@ -36,7 +36,7 @@ export interface ServiceMethod {
 
 
 export interface ServiceInfo {
-    class: ServiceClassConstructible;
+    // class: ServiceClassConstructible;
     methods: {
         [methodName: string]: ServiceMethod;
     };
@@ -61,7 +61,7 @@ export const ParamSchema = Joi.object({
             { is: "string", then: Joi.string().required() },
             { is: "number", then: Joi.number().required() },
             { is: "boolean", then: Joi.boolean().required() },
-            { is: "object", then: Joi.object().required () },
+            { is: "object", then: Joi.object().required() },
         ],
         otherwise: Joi.any().optional(),
     }).optional(),
@@ -83,3 +83,26 @@ export interface JsonResult {
         value: ValueType;
     };
 }
+
+export interface RequestData {
+    serviceName: string;
+    methodName: string;
+    args: {
+        [key: string]: ValueType;
+    };
+}
+
+export const RequestDataSchema = Joi.object({
+    serviceName: Joi.string().required(),
+    methodName: Joi.string().required(),
+    args: Joi.object().pattern(
+        OBJECT_KEY_PATTERN,
+        Joi.alternatives().try(
+            Joi.string(),
+            Joi.number(),
+            Joi.boolean(),
+            Joi.object(),
+        )
+    )
+        .required(),
+});

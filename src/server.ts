@@ -1,18 +1,19 @@
 import * as Http from "http";
 import { EventEmitter } from "events";
 import { createLogger, Logger, LoggerOptions, format, transports } from "winston";
-import { ServiceDefintion } from "./service-validator";
+import { ServiceDefintion, RequestData, RequestDataSchema, ValueType, ParamType } from "./service-validator";
 import { Service } from "./service";
+import MethodMapHandler from "./register-method";
+
+type LogLevel = "debug" | "warn" | "info" | "error";
 
 interface ServerConfig {
     port?: number;
     host?: string;
-    logLevel?: string;
+    logLevel?: LogLevel;
     serviceDefinition: ServiceDefintion;
     endpoint: string;
 }
-
-type LogLevel = "debug" | "warn" | "info" | "error";
 
 interface WinstonTransport {
     name: "console" | "file" | "http";
@@ -22,15 +23,30 @@ interface WinstonTransport {
     port?: string;
 }
 
-export class Server extends EventEmitter {
+export class Server {
     private server: Http.Server;
     private logger: Logger;
     private loggerTransports: WinstonTransport[];
     private isStarted = false;
+    private emitter: EventEmitter;
+    private methodMap: MethodMapHandler;
 
     constructor(private config: ServerConfig) {
-        super();
         this.loggerTransports = [];
+        this.emitter = new EventEmitter();
+        this.methodMap = new MethodMapHandler({});
+
+        this.initializeServices = this.initializeServices.bind(this);
+        this.parseMessage = this.parseMessage.bind(this);
+    }
+
+    public addFunction(fn: Function, fnName?: string): Server {
+        const name = fnName || fn.name;
+        if (!name) {
+            throw new Error('Function name is required!');
+        }
+        this.methodMap.add(name, fn);
+        return this;
     }
 
     public addConsoleLogger(logLevel: LogLevel): Server {
@@ -74,16 +90,14 @@ export class Server extends EventEmitter {
 
         serviceNames.forEach((serviceName) => {
             const service = new Service(serviceName, this.config.serviceDefinition[serviceName], this.logger);
-            service.subscribeToMethods(this);
+            service.subscribeToMethods(this.emitter, this.methodMap);
         });
     }
 
-    public start(callback?: Function): void {
-        const { port, host, logLevel } = this.config;
-
+    private setupLogger(): void {
         // set up logger
         const loggerOptions: LoggerOptions = {
-            level: logLevel || "debug",
+            level: this.config.logLevel || "debug",
             format: format.json(),
             transports: [
                 ...(this.loggerTransports.map((transport) => {
@@ -114,11 +128,19 @@ export class Server extends EventEmitter {
             ],
         };
         this.logger = createLogger(loggerOptions);
+    }
 
-        // set up server instance
+    public start(callback?: Function): void {
+        const { port, host, endpoint } = this.config;
+        if (!endpoint) {
+            this.config.endpoint = '/messages';
+        }
+        this.setupLogger();
+        this.initializeServices();
         this.server = Http.createServer(this.parseMessage);
         this.server.listen(port, host, () => {
-            this.logger.info(`Server started at ${host}:${port}`);
+            this.logger.info(`Server started at http://${host || 'localhost'}:${port}`);
+            this.logger.info(`Endpoint: ${this.config.endpoint}`);
             if (callback) {
                 callback();
             }
@@ -129,37 +151,62 @@ export class Server extends EventEmitter {
         const { method, url } = request;
         this.logger.debug(`Parsing message: /${method} ${url}`);
 
-        if (method.toUpperCase() !== "POST") {
+        if (method.toUpperCase() !== "POST" || url !== this.config.endpoint) {
             // return bad request
+            this.logger.debug(`Bad Request: /${method} ${url}`);
             response.statusCode = 400;
             return response.end("Bad Request");
         }
 
-        if (url === this.config.endpoint) {
-            // read request body content
-            const buffer: Uint8Array[] = [];
-            request
-                .on("data", chunk => buffer.push(chunk))
-                .on("end", () => {
-                    const rawData = Buffer.concat(buffer).toString();
-                    try {
-                        const parsed = JSON.parse(rawData);
-                        this.logger.debug(parsed);
+        // read request body content
+        const buffer: Uint8Array[] = [];
 
-                        const requiredFields = ["args", "methodName", "name"];
-                        const missingFields = requiredFields.filter(field => !parsed[field]);
-                        if (missingFields.length) {
-                            const errorMessage = `Missing fields: ${missingFields}`;
-                            this.logger.debug(errorMessage);
-                            throw new Error(errorMessage);
-                        }
-                        return parsed;
-                    } catch (error) {
-                        this.logger.error(error);
-                        response.statusCode = 500;
-                        return response.end(`Error parsing data: ${JSON.stringify(error)}`);
+        // subscribe to emitter with results
+        this.emitter.on('result', (resultData: string) => {
+            this.logger.debug(`Received emitted result: ${resultData}`);
+            const parsedResults: {
+                statusCode: number;
+                message?: string;
+                value?: {
+                    data: {
+                        type: ParamType;
+                        value: ValueType;
+                    };
+                };
+            } = JSON.parse(resultData);
+            response.setHeader("Content-Type", "application/json");
+            response.statusCode = parsedResults.statusCode;
+            response.end(parsedResults.message || JSON.stringify(parsedResults.value));
+            this.logger.info(` /${method} ${url} - ${parsedResults.statusCode}`);
+        });
+
+        request
+            .on("data", chunk => buffer.push(chunk))
+            .on("end", () => {
+                const rawData = Buffer.concat(buffer).toString();
+                try {
+                    const parsed: RequestData = JSON.parse(rawData);
+                    this.logger.debug(`Parsed data: ${JSON.stringify(parsed)}`);
+
+                    const { error: validationError } = RequestDataSchema.validate(parsed);
+                    if (validationError) {
+                        // return bad request
+                        this.logger.error(validationError);
+                        this.logger.debug(`Bad Request: /${method} ${url}`);
+                        response.statusCode = 400;
+                        return response.end("Bad Request");
                     }
-                });
-        }
+                    const { serviceName, methodName, args } = parsed;
+                    this.logger.debug(`Emitting to key: ${serviceName}_${methodName}`);
+                    this.emitter.emit(`${serviceName}_${methodName}`, { args });
+                } catch (error) {
+                    this.logger.debug(error);
+                    this.logger.error(error);
+                    this.emitter.emit('result', JSON.stringify({
+                        statusCode: 500,
+                        message: 'Internal server error',
+                    }));
+                }
+            });
     }
 }

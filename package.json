@@ -8,21 +8,29 @@
     "build": "./node_modules/.bin/tsc",
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint . --ext .ts --fix",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start:test": "node lib/test.js",
+    "test": "jest **/*.spec.ts"
   },
   "author": "Adu Williams <aduwillie@gmail.com>",
   "license": "ISC",
   "devDependencies": {
+    "@babel/core": "^7.9.6",
+    "@babel/preset-env": "^7.9.6",
+    "@babel/preset-typescript": "^7.9.0",
     "@types/hapi__joi": "^17.1.0",
+    "@types/jest": "^25.2.3",
     "@types/node": "^14.0.1",
     "@types/winston": "^2.4.4",
     "@typescript-eslint/eslint-plugin": "^2.33.0",
     "@typescript-eslint/parser": "^2.33.0",
+    "babel-jest": "^26.0.1",
     "eslint": "^7.0.0",
+    "jest": "^26.0.1",
     "typescript": "^3.9.2"
   },
   "dependencies": {
     "@hapi/joi": "^17.1.1",
+    "uuid": "^8.1.0",
     "winston": "^3.2.1"
   }
 }
