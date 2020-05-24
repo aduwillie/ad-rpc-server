@@ -6,6 +6,7 @@
   "scripts": {
     "prebuild": "npm run lint",
     "build": "./node_modules/.bin/tsc",
+    "build:types": "tsc -d --declarationDir lib --declarationMap --emitDeclarationOnly",
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint . --ext .ts --fix",
     "start:test": "node lib/test.js",
