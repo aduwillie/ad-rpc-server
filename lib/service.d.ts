@@ -10,3 +10,4 @@ export declare class Service {
     constructor(name: string, serviceInfo: ServiceInfo, logger: Logger);
     subscribeToMethods(emitter: EventEmitter, methodMap: MethodMapHandlerInterface): void;
 }
+//# sourceMappingURL=service.d.ts.map

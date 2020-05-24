@@ -53,3 +53,4 @@ export interface RequestData {
     };
 }
 export declare const RequestDataSchema: Joi.ObjectSchema<any>;
+//# sourceMappingURL=service-validator.d.ts.map

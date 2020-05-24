@@ -12,3 +12,4 @@ declare class MethodMapHandler implements MethodMapHandlerInterface {
     get(key: string): Function;
 }
 export default MethodMapHandler;
+//# sourceMappingURL=register-method.d.ts.map
